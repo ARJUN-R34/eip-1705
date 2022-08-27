@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 
 import "./IERC1705.sol";
 import "./IERC1705Receiver.sol";
-import "./extensions/IERC721Metadata.sol";
+import "./extensions/IERC1705Metadata.sol";
 import "../utils/Address.sol";
 import "../utils/Context.sol";
 import "../utils/Strings.sol";
@@ -14,7 +14,7 @@ import "../utils/introspection/ERC165.sol";
 /**
  * @dev Proposed ERC1705 (SBT) token contract.
  */
-contract ERC1705 is Context, ERC165, IERC1705, IERC721Metadata {
+contract ERC1705 is Context, ERC165, IERC1705, IERC1705Metadata {
     using Address for address;
     using Strings for uint256;
 
@@ -36,6 +36,9 @@ contract ERC1705 is Context, ERC165, IERC1705, IERC721Metadata {
     // Mapping from owner to operator approvals
     mapping(address => mapping(address => bool)) private _operatorApprovals;
 
+    // Mapping to check if the contract is whitelisted for the user
+    mapping(address => mapping(address => bool)) private _approvedContract;
+
     /**
      * @dev Initializes the contract by setting a `name` and a `symbol` to the token collection.
      */
@@ -50,7 +53,7 @@ contract ERC1705 is Context, ERC165, IERC1705, IERC721Metadata {
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
         return
             interfaceId == type(IERC1705).interfaceId ||
-            interfaceId == type(IERC721Metadata).interfaceId ||
+            interfaceId == type(IERC1705Metadata).interfaceId ||
             super.supportsInterface(interfaceId);
     }
 
@@ -72,21 +75,21 @@ contract ERC1705 is Context, ERC165, IERC1705, IERC721Metadata {
     }
 
     /**
-     * @dev See {IERC721Metadata-name}.
+     * @dev See {IERC1705Metadata-name}.
      */
     function name() public view virtual override returns (string memory) {
         return _name;
     }
 
     /**
-     * @dev See {IERC721Metadata-symbol}.
+     * @dev See {IERC1705Metadata-symbol}.
      */
     function symbol() public view virtual override returns (string memory) {
         return _symbol;
     }
 
     /**
-     * @dev See {IERC721Metadata-tokenURI}.
+     * @dev See {IERC1705Metadata-tokenURI}.
      */
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
         _requireMinted(tokenId);
@@ -126,8 +129,12 @@ contract ERC1705 is Context, ERC165, IERC1705, IERC721Metadata {
      *
      * Emits a {Transfer} event.
      */
-    function _safeMint(address to, uint256 tokenId) internal virtual {
-        _safeMint(to, tokenId, "");
+    function _safeMint(address to, uint256 tokenId, bytes memory signature) internal virtual {
+        if (_approvedContract[msg.sender][address(this)] === false) {
+            require(signature.length > 0, "ERC1705: Signature required. Not a whitelisted contract")
+        }
+
+        _safeMint(to, tokenId, "", signature);
     }
 
     /**
@@ -137,9 +144,14 @@ contract ERC1705 is Context, ERC165, IERC1705, IERC721Metadata {
     function _safeMint(
         address to,
         uint256 tokenId,
-        bytes memory data
+        bytes memory data,
+        bytes memory signature,
     ) internal virtual {
-        _mint(to, tokenId);
+        if (_approvedContract[msg.sender][address(this)] === false) {
+            require(signature.length > 0, "ERC1705: Signature required. Not a whitelisted contract")
+        }
+
+        _mint(to, tokenId, signature);
         require(
             _checkOnERC1705Received(address(0), to, tokenId, data),
             "ERC1705: transfer to non ERC1705Receiver implementer"
@@ -158,9 +170,13 @@ contract ERC1705 is Context, ERC165, IERC1705, IERC721Metadata {
      *
      * Emits a {Transfer} event.
      */
-    function _mint(address to, uint256 tokenId) internal virtual {
+    function _mint(address to, uint256 tokenId, bytes memory signature) internal virtual {
         require(to != address(0), "ERC1705: mint to the zero address");
         require(!_exists(tokenId), "ERC1705: token already minted");
+
+        if (_approvedContract[msg.sender][address(this)] === false) {
+            require(signature.length > 0, "ERC1705: Signature required. Not a whitelisted contract")
+        }
 
         _beforeTokenTransfer(address(0), to, tokenId);
 

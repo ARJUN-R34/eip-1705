@@ -9,7 +9,7 @@ import "../IERC1705.sol";
  * @title ERC-1705 Non-Fungible Token Standard, optional metadata extension
  * @dev See https://eips.ethereum.org/EIPS/eip-1705
  */
-interface IERC721Metadata is IERC1705 {
+interface IERC1705Metadata is IERC1705 {
     /**
      * @dev Returns the token collection name.
      */
